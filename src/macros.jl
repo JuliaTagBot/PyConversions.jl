@@ -15,19 +15,35 @@ correctly would require a somewhat complicated macro that looked for all assignm
 block and repeated them after the `try` construct.
 """
 macro pywith(context, as::Symbol, block::Expr)
+    # is it possible to escape only portions of the output, or do I have to do this?
+    sys = gensym()
+    mgr = gensym()
+    exit = gensym()
+    value = gensym()
     esc(quote
-        @pyimport sys
-        mgr = $context
-        exit = pytypeof(mgr)[:__exit__]
-        value = pytypeof(mgr)[:__enter__](mgr)
-        exc = true
-        let $as = value
+        @pyimport sys as $sys
+        $mgr = $context
+        $exit = pytypeof($mgr)[:__exit__]
+        $value = pytypeof($mgr)[:__enter__]($mgr)
+        let $as = $value
             $block
         end
-        exit(mgr, sys.exc_info()...)
+        $exit($mgr, $sys.exc_info()...)
+    end)
+end
+
+macro pywith(context, block::Expr)
+    sys = gensym()
+    mgr = gensym()
+    exit = gensym()
+    esc(quote
+        @pyimport sys
+        $mgr = $context
+        $exit = pytypeof($mgr)[:__exit__]
+        pytypeof($mgr)[:__enter__]($mgr)
+        $block
+        $exit($mgr, sys.exc_info()...)
     end)
 end
 export @pywith
-
-
 
